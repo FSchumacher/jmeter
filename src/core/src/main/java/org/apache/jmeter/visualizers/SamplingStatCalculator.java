@@ -20,7 +20,7 @@ package org.apache.jmeter.visualizers;
 import java.util.Map;
 
 import org.apache.jmeter.samplers.SampleResult;
-import org.apache.jorphan.math.StatCalculatorLong;
+import org.apache.jmeter.util.JMeterUtils;
 
 /**
  * Aggregate sample data container. Just instantiate a new instance of this
@@ -28,7 +28,7 @@ import org.apache.jorphan.math.StatCalculatorLong;
  * the stats out with whatever methods you prefer.
  */
 public class SamplingStatCalculator {
-    private final StatCalculatorLong calculator = new StatCalculatorLong();
+    private final HistogramStatCalculator calculator = new HistogramStatCalculator();
 
     private double maxThroughput;
 
@@ -172,43 +172,52 @@ public class SamplingStatCalculator {
      * @return newly created sample with current statistics
      */
     public Sample addSample(SampleResult res) {
+        Sample[] holder = new Sample[1];
+        Runnable runnable = () -> addSampleInEDT(res, holder);
+        JMeterUtils.runSafe(true, runnable);
+        return holder[0];
+    }
+
+    private void addSampleInEDT(SampleResult res, Sample[] holder) {
         long rtime;
-        long cmean;
-        long cstdv;
-        long cmedian;
-        long cpercent;
+        long cmean = 0;
+        long cstdv = 0;
+        long cmedian = 0;
+        long cpercent = 0;
         long eCount;
         long endTime;
         double throughput;
         boolean rbool;
-        synchronized (calculator) {
-            calculator.addValue(res.getTime(), res.getSampleCount());
-            calculator.addBytes(res.getBytesAsLong());
-            calculator.addSentBytes(res.getSentBytes());
-            setStartTime(res);
-            eCount = getCurrentSample().getErrorCount();
-            eCount += res.getErrorCount();
-            endTime = getEndTime(res);
-            long howLongRunning = endTime - firstTime;
-            throughput = ((double) calculator.getCount() / (double) howLongRunning) * 1000.0;
-            if (throughput > maxThroughput) {
-                maxThroughput = throughput;
-            }
 
-            rtime = res.getTime();
-            cmean = (long)calculator.getMean();
-            cstdv = (long)calculator.getStandardDeviation();
-            cmedian = calculator.getMedian();
-            cpercent = calculator.getPercentPoint(0.500);
-// TODO cpercent is the same as cmedian here - why? and why pass it to "distributionLine"?
-            rbool = res.isSuccessful();
+        calculator.addValue(Long.valueOf(res.getTime()), res.getSampleCount());
+        calculator.addBytes(res.getBytesAsLong());
+        calculator.addSentBytes(res.getSentBytes());
+        setStartTime(res);
+        eCount = getCurrentSample().getErrorCount();
+        eCount += res.getErrorCount();
+        endTime = getEndTime(res);
+        long howLongRunning = endTime - firstTime;
+        throughput = ((double) calculator.getCount() / (double) howLongRunning)
+                * 1000.0;
+        if (throughput > maxThroughput) {
+            maxThroughput = throughput;
         }
+
+        rtime = res.getTime();
+
+        cmean = (long) calculator.getMean();
+        cstdv = (long) calculator.getStandardDeviation();
+        cmedian = calculator.getMedian().longValue();
+        cpercent = calculator.getPercentPoint(0.500).longValue();
+        // TODO cpercent is the same as cmedian here - why? and why pass it to
+        // "distributionLine"?
+        rbool = res.isSuccessful();
 
         long count = calculator.getCount();
         Sample s =
             new Sample( null, rtime, cmean, cstdv, cmedian, cpercent, throughput, eCount, rbool, count, endTime );
         currentSample = s;
-        return s;
+        holder[0]=s;
     }
 
     private long getEndTime(SampleResult res) {
@@ -289,7 +298,7 @@ public class SamplingStatCalculator {
     }
 
     public Number getMeanAsNumber() {
-        return (long) calculator.getMean();
+        return Long.valueOf((long) calculator.getMean());
     }
 
     public Number getMedian() {
