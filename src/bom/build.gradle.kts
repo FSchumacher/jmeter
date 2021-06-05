@@ -93,6 +93,7 @@ dependencies {
         apiv("commons-logging:commons-logging")
         apiv("commons-net:commons-net")
         apiv("dnsjava:dnsjava")
+        apiv("org.hdrhistogram:HdrHistogram")
         apiv("io.burt:jmespath-core")
         apiv("io.burt:jmespath-jackson")
         apiv("javax.activation:javax.activation-api", "javax.activation")
