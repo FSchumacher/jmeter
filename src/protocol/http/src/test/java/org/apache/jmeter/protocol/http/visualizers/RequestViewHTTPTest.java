@@ -18,10 +18,14 @@
 package org.apache.jmeter.protocol.http.visualizers;
 
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class RequestViewHTTPTest {
 
@@ -191,4 +195,20 @@ public class RequestViewHTTPTest {
         Assertions.assertEquals(query, param1.getValue()[0]);
         Assertions.assertTrue(StringUtils.isBlank(param1.getKey()));
     }
+
+    private static Stream<Arguments> data() {
+        return Stream.of(
+                Arguments.of("k1=v1&=&k2=v2", 2),
+                Arguments.of("=", 0),
+                Arguments.of("k1=v1&=value&k2=v2", 3));
+    }
+
+    @ParameterizedTest
+    @MethodSource("data")
+    public void testGetQueryMapWithEmptyKeyAndValue(String query, int numParamExpect) {
+        Map<String, String[]> params = RequestViewHTTP.getQueryMap(query);
+        Assertions.assertNotNull(params);
+        Assertions.assertEquals(numParamExpect, params.size());
+    }
+
 }
