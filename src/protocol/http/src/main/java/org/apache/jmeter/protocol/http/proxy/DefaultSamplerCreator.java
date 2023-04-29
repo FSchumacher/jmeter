@@ -23,6 +23,8 @@ import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.MessageFormat;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import javax.xml.XMLConstants;
@@ -359,18 +361,42 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
         String prefix = StringUtils.defaultString(request.getPrefix(), "");
         int httpSampleNameMode = request.getHttpSampleNameMode();
         String format = getFormat(httpSampleNameMode, request.getHttpSampleNameFormat());
-        if (!HTTPConstants.CONNECT.equals(request.getMethod()) && isNumberRequests()) {
-            sampler.setName(MessageFormat.format(format, prefix, sampler.getPath(), incrementRequestNumberAndGet()));
-        } else {
-            sampler.setName(MessageFormat.format(format, prefix, sampler.getPath()));
+        String url = null;
+        try {
+            url = sampler.getUrl().toString();
+        } catch (MalformedURLException e) {
+            url = "MALFORMED-URL";
+            log.warn("Could not get URL to name sample", e);
         }
+        List<Object> values = Arrays.asList(
+                prefix,
+                sampler.getPath(),
+                sampler.getMethod(),
+                sampler.getDomain(),
+                sampler.getProtocol(),
+                sampler.getPort(),
+                url
+        );
+        Object[] valuesArray;
+        if (!HTTPConstants.CONNECT.equals(request.getMethod()) && isNumberRequests()) {
+            valuesArray = values.toArray(new Object[values.size() + 1]);
+            valuesArray[values.size()] = incrementRequestNumberAndGet();
+        } else {
+            valuesArray = values.toArray();
+        }
+        sampler.setName(MessageFormat.format(format,valuesArray));
     }
 
     private String getFormat(int httpSampleNameMode, String format) {
         if (httpSampleNameMode == SAMPLER_NAME_NAMING_MODE_FORMATTER) {
             return format.replaceAll("#\\{name([,}])", "{0$1")
                     .replaceAll("#\\{path([,}])", "{1$1")
-                    .replaceAll("#\\{counter([,}])", "{2$1");
+                    .replaceAll("#\\{method([,}])", "{2$1")
+                    .replaceAll("#\\{host([,}])", "{3$1")
+                    .replaceAll("#\\{scheme([,}])", "{4$1")
+                    .replaceAll("#\\{port([,}])", "{5$1")
+                    .replaceAll("#\\{url([,}])", "{6$1")
+                    .replaceAll("#\\{counter([,}])", "{7$1");
         }
         if (isNumberRequests()) {
             return getNumberedFormat(httpSampleNameMode);
@@ -389,13 +415,13 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
 
     private String getNumberedFormat(int httpSampleNameMode) {
         if (httpSampleNameMode == SAMPLER_NAME_NAMING_MODE_PREFIX) {
-            return "{0}{1}-{2}";
+            return "{0}{1}-{7}";
         }
         if (httpSampleNameMode == SAMPLER_NAME_NAMING_MODE_COMPLETE) {
-            return "{0}-{2}";
+            return "{0}-{7}";
         }
         if (httpSampleNameMode == SAMPLER_NAME_NAMING_MODE_SUFFIX) {
-            return "{0}-{2} {1}";
+            return "{0}-{7} {1}";
         }
         return "{1}";
     }
